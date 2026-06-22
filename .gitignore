@@ -1,0 +1,6 @@
+tasks.db
+uploads/
+__pycache__/
+*.pyc
+.env
+DEEPSEEK_KEY=sk-
