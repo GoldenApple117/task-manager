@@ -49,11 +49,17 @@ cd task-manager
 pip install flask requests
 ```
 
-### 3. 配置环境变量（可选）
+### 3. 配置环境变量（可选，AI 功能需要）
 
 ```bash
-# DeepSeek API Key（启用 AI 审核 + AI辅助撰写）
-export DEEPSEEK_KEY="sk-xxx"
+# AI API Key（兼容 DEEPSEEK_KEY）
+export AI_API_KEY="sk-xxx"
+
+# AI API 地址（默认 DeepSeek，可切换其他兼容 OpenAI 格式的服务）
+export AI_API_URL="https://api.deepseek.com/v1/chat/completions"
+
+# AI 模型名（默认 deepseek-chat）
+export AI_MODEL="deepseek-chat"
 
 # 文件上传目录（默认当前目录下 uploads/）
 export UPLOAD_DIR="/path/to/uploads"
@@ -79,7 +85,7 @@ python app.py
 
 1. Fork 本仓库到你的 GitHub
 2. 在 [Railway](https://railway.app) 中 New Project → Deploy from GitHub repo
-3. 添加环境变量：`DEEPSEEK_KEY`、`UPLOAD_DIR`（设为 `/app/uploads`）
+3. 添加环境变量：`AI_API_KEY`（或兼容 `DEEPSEEK_KEY`）、`UPLOAD_DIR`（设为 `/app/uploads`）
 4. 添加 Volume 挂载到 `/app/uploads`（持久化文件存储）
 5. Railway 自动构建部署
 
@@ -103,3 +109,35 @@ python app.py
 ├── uploads/       # Word 文件存储目录
 └── README.md
 ```
+
+---
+
+## 切换 AI 服务商
+
+系统使用 OpenAI 兼容 API 格式，只需设置三个环境变量即可切换：
+
+### DeepSeek（默认）
+
+```bash
+export AI_API_KEY="sk-xxx"
+export AI_API_URL="https://api.deepseek.com/v1/chat/completions"
+export AI_MODEL="deepseek-chat"
+```
+
+### OpenAI
+
+```bash
+export AI_API_KEY="sk-xxx"
+export AI_API_URL="https://api.openai.com/v1/chat/completions"
+export AI_MODEL="gpt-4o"
+```
+
+### 其他兼容服务
+
+| 服务 | AI_API_URL | AI_MODEL |
+|------|-----------|----------|
+| 阿里通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions` | `qwen-plus` |
+| 百度文心一言 | `https://qianfan.baidubce.com/v2/chat/completions` | `ernie-4.0` |
+| 本地 Ollama | `http://localhost:11434/v1/chat/completions` | `qwen2.5:7b` |
+
+任何兼容 OpenAI `/v1/chat/completions` 格式的 API 都可直接接入。

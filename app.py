@@ -10,9 +10,10 @@ app = Flask(__name__)
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tasks.db')
 PORT = int(os.environ.get("PORT", 5090))
 
-# DeepSeek AI审核配置
-DEEPSEEK_KEY = os.environ.get("DEEPSEEK_KEY", "")
-DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+# AI 配置（兼容旧 DEEPSEEK_KEY）
+AI_API_KEY = os.environ.get("AI_API_KEY", "") or os.environ.get("DEEPSEEK_KEY", "")
+AI_API_URL = os.environ.get("AI_API_URL", "https://api.deepseek.com/v1/chat/completions")
+AI_MODEL = os.environ.get("AI_MODEL", "deepseek-chat")
 
 # ========== Database ==========
 def init_db():
@@ -76,7 +77,7 @@ def set_config(key, value):
 
 # ========== AI审核 ==========
 def ai_review(title, description):
-    if not DEEPSEEK_KEY:
+    if not AI_API_KEY:
         return None
     prompt = f"""你是项目管理助手。请按以下宽松标准审核任务描述：
 
@@ -95,9 +96,9 @@ def ai_review(title, description):
 
     task_text = f"任务标题：{title}\n任务描述：{description or '（无）'}"
     try:
-        resp = requests.post(DEEPSEEK_URL, headers={
-            "Authorization": f"Bearer {DEEPSEEK_KEY}", "Content-Type": "application/json"
-        }, json={"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt + "\n\n" + task_text}],
+        resp = requests.post(AI_API_URL, headers={
+            "Authorization": f"Bearer {AI_API_KEY}", "Content-Type": "application/json"
+        }, json={"model": AI_MODEL, "messages": [{"role": "user", "content": prompt + "\n\n" + task_text}],
                  "temperature": 0.3, "max_tokens": 500}, timeout=20)
         if resp.status_code == 200:
             content = resp.json()["choices"][0]["message"]["content"].strip()
@@ -406,8 +407,8 @@ def ai_generate_desc():
     title = data.get('title', '').strip()
     if not title:
         return jsonify({'ok':False,'error':'请输入任务标题'})
-    if not DEEPSEEK_KEY:
-        return jsonify({'ok':False,'error':'未配置DeepSeek API Key'})
+    if not AI_API_KEY:
+        return jsonify({'ok':False,'error':'未配置AI API Key'})
     context = f"任务标题：{title}"
     if data.get('owner'): context += f"\n负责人：{data['owner']}"
     if data.get('helpers'): context += f"\n协助人：{data['helpers']}"
@@ -416,9 +417,9 @@ def ai_generate_desc():
     if data.get('due_date'): context += f"\n截止日期：{data['due_date']}"
     prompt = f"根据以下任务信息，写一段简洁的任务描述（2-3句话，包含交付物和具体产出形式）。只输出描述文本，不要任何前缀。\n\n{context}"
     try:
-        resp = requests.post(DEEPSEEK_URL, headers={
-            "Authorization": f"Bearer {DEEPSEEK_KEY}", "Content-Type": "application/json"
-        }, json={"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}],
+        resp = requests.post(AI_API_URL, headers={
+            "Authorization": f"Bearer {AI_API_KEY}", "Content-Type": "application/json"
+        }, json={"model": AI_MODEL, "messages": [{"role": "user", "content": prompt}],
                  "temperature": 0.7, "max_tokens": 200}, timeout=15)
         if resp.status_code == 200:
             desc = resp.json()["choices"][0]["message"]["content"].strip()
