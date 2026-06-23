@@ -752,7 +752,7 @@ async function loadFiles(){
   if(!d.files.length)h='<div class="empty">暂无文件</div>';
   else d.files.forEach(f=>{
     let s=f.size<1024?f.size+' B':(f.size/1024).toFixed(1)+' KB';
-    h+=`<div class="task"><div class="task-main"><div style="font-size:14px;font-weight:500">📄 ${f.name}</div><div style="font-size:12px;color:#8f959e;margin-top:2px">${s} · ${f.time}</div></div><div class="task-actions"><a href="/api/download/${encodeURIComponent(f.name)}" class="btn btn-p" style="text-decoration:none">⬇ 下载</a></div></div>`;
+    h+=`<div class="task"><div class="task-main"><div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">📄 ${f.name}</div><div style="font-size:12px;color:#8f959e;margin-top:2px">${s} · ${f.time}</div></div><div class="task-actions"><a href="/api/download/${encodeURIComponent(f.name)}" class="btn btn-p" style="text-decoration:none;white-space:nowrap">⬇ 下载</a></div></div>`;
   });
   document.getElementById('fileListBox').innerHTML=h;
 }
