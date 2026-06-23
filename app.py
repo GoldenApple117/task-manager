@@ -724,7 +724,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 <h2>⚙ 群机器人配置</h2>
 <p style="font-size:13px;color:#646a73;margin-bottom:14px">飞书群 → 设置 → 群机器人 → 添加机器人 → 复制Webhook地址</p>
 <div class="fld"><label>Webhook URL</label><input id="cfgUrl" value="{{ config.webhook }}" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxx"></div>
-<div class="modal-actions">
+  <div class="fld"><label>人员名单（逗号分隔）</label><input id="cfgMembers" value="{{ config.members }}" placeholder="金崧,宋璟祺,何岗,王亚妮"></div>
+  <div class="modal-actions">
   <button class="btn btn-o" onclick="closeModal('configModal')">取消</button>
   <button class="btn btn-p" onclick="saveConfig()">保存</button>
 </div></div></div>
