@@ -356,6 +356,17 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 def download_file(filename):
     return send_from_directory(UPLOAD_DIR, filename, as_attachment=True)
 
+@app.route('/api/files')
+def list_files():
+    items = []
+    if os.path.exists(UPLOAD_DIR):
+        for f in sorted(os.listdir(UPLOAD_DIR)):
+            fp = os.path.join(UPLOAD_DIR, f)
+            if os.path.isfile(fp):
+                s = os.stat(fp)
+                items.append({'name':f,'size':s.st_size,'time':datetime.datetime.fromtimestamp(s.st_mtime).strftime('%Y-%m-%d %H:%M')})
+    return jsonify({'files':items})
+
 @app.route('/api/upload/<int:task_id>', methods=['POST'])
 def upload_file(task_id):
     if 'file' not in request.files:
@@ -464,6 +475,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
   <a href="#" onclick="switchView('done',this);return false">✅ 已完成</a>
   <a href="#" onclick="switchView('cancel',this);return false">🚫 已取消</a>
   <div style="margin-top:20px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
+    <a href="#" onclick="switchView('files',this);return false">📁 文件管理</a>
     <a href="#" onclick="switchView('guide',this);return false">📖 发布须知</a>
     <a href="#" onclick="switchView('charts',this);return false">📊 统计图表</a>
     <a href="#" onclick="openConfig();return false">⚙ 设置</a>
@@ -510,6 +522,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
       <p><strong>👥 人员名单：</strong>金崧、宋璟祺、何岗、王亚妮</p>
     </div>
   </div>
+</div>
+</div>
+
+<div id="filesSection" style="display:none">
+  <div class="topbar"><h2>📁 文件管理</h2></div>
+  <div id="fileListBox" class="task-list"></div>
 </div>
 </div>
 
@@ -569,10 +587,11 @@ function switchView(v,btn){
   view=v;
   document.querySelectorAll('.sidebar a').forEach(a=>a.classList.remove('active'));
   btn.classList.add('active');
-  let sections=['filterBar','chartSection','taskList','guideSection'];
-  sections.forEach(s=>document.getElementById(s).style.display='none');
+  let sections=['filterBar','chartSection','taskList','guideSection','filesSection'];
+  sections.forEach(s=>{let el=document.getElementById(s);if(el)el.style.display='none';});
   if(v==='charts'){document.getElementById('chartSection').style.display='';renderCharts();}
   else if(v==='guide'){document.getElementById('guideSection').style.display='';}
+  else if(v==='files'){document.getElementById('filesSection').style.display='';loadFiles();}
   else{
     document.getElementById('taskList').style.display='';
     if(v==='todo')filter='todo';
@@ -727,6 +746,15 @@ async function doEdit(){
 async function saveConfig(){
   await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({webhook_url:document.getElementById('cfgUrl').value.trim()})});
   closeModal('configModal');showToast('已保存',true);
+}
+async function loadFiles(){
+  let r=await fetch('/api/files'),d=await r.json(),h='';
+  if(!d.files.length)h='<div class="empty">暂无文件</div>';
+  else d.files.forEach(f=>{
+    let s=f.size<1024?f.size+' B':(f.size/1024).toFixed(1)+' KB';
+    h+=`<div class="task"><div class="task-main"><div style="font-size:14px;font-weight:500">📄 ${f.name}</div><div style="font-size:12px;color:#8f959e;margin-top:2px">${s} · ${f.time}</div></div><div class="task-actions"><a href="/api/download/${encodeURIComponent(f.name)}" class="btn btn-p" style="text-decoration:none">⬇ 下载</a></div></div>`;
+  });
+  document.getElementById('fileListBox').innerHTML=h;
 }
 loadData();
 </script>
