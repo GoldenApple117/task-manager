@@ -653,7 +653,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
   <div style="margin-top:20px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
     <a href="#" onclick="switchView('files',this);return false">📁 文件管理</a>
     <a href="/submit" target="_blank">📤 提交文件</a>
-    <a href="#" onclick="switchView('guide',this);return false">📖 发布须知</a>
+    <a href="#" onclick="switchView('guide',this);return false">📖 使用须知</a>
     <a href="#" onclick="switchView('charts',this);return false">📊 统计图表</a>
     <a href="#" onclick="openConfig();return false">⚙ 设置</a>
   </div>
@@ -682,21 +682,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 
 <div id="guideSection" style="display:none">
   <div class="chart-box" style="margin-bottom:16px">
-    <h3>📖 AI审核标准（宽松）</h3>
+    <h3>📖 系统使用说明</h3>
     <div style="font-size:14px;line-height:2;color:#646a73">
-      <p>同时满足以下<strong>三条</strong>即为 ✅通过：</p>
-      <p>1️⃣ 任务标题能看出<strong>大致做什么</strong>（非单字/非纯编号即可）</p>
-      <p>2️⃣ 描述了<strong>交付物或产出形式</strong>（哪怕只说"报告""文档""代码"）</p>
-      <p>3️⃣ 有大致<strong>时间节点</strong>或截止日期（哪怕只说"尽快""本周"）</p>
+      <p><strong>📋 发布任务</strong> — 点击「+ 发布任务」，填写标题/负责人/验收人/截止日期，可点「🤖 AI辅助撰写」生成描述</p>
+      <p><strong>🔄 任务流转</strong> — 待开始 → 进行中 → 待验收 → 验收人评分写评语 → 已完成</p>
+      <p><strong>📎 提交Word文档</strong> — 点击「📤 提交文件」或群内链接，选任务后上传 .doc/.docx</p>
+      <p><strong>📁 文件管理</strong> — 查看已上传的全部文档，支持下载</p>
+      <p><strong>📤 推送收集链接</strong> — 顶部按钮可推送文档收集链接到群聊，群成员自助提交</p>
+      <p><strong>📊 统计图表</strong> — 查看任务状态分布和各负责人任务数</p>
+      <p><strong>⚙ 设置</strong> — 配置群机器人 Webhook、管理团队成员名单</p>
       <hr style="margin:16px 0;border-color:#f0f1f3">
-      <p><strong>宽容原则：</strong></p>
-      <p>• 只要基本能看懂任务意图，就给通过</p>
-      <p>• 不咬文嚼字，不过度挑剔用词</p>
-      <p>• 只有完全看不懂才标 ⚠️需修正</p>
+      <p><strong>🤖 AI审核标准（宽松）：</strong></p>
+      <p>1️⃣ 标题能看出大致做什么 ｜ 2⃣ 有交付物或产出形式 ｜ 3⃣ 有大致时间节点</p>
+      <p>只要基本能看懂就给通过，不过度挑剔</p>
       <hr style="margin:16px 0;border-color:#f0f1f3">
-      <p><strong>📎 产出物要求：Word格式</strong></p>
-      <p><strong>📁 Word存放路径：</strong>D:\\test\\</p>
-      <p><strong>👥 人员名单：</strong><span id="guideMembers">{{ config.members }}</span></p>
+      <p><strong>📎 产出物要求：</strong>Word格式（.doc/.docx）</p>
+      <p><strong>👥 团队成员：</strong><span id="guideMembers">{{ config.members }}</span></p>
     </div>
   </div>
 </div>
