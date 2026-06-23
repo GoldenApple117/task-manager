@@ -387,7 +387,7 @@ HTML_INDEX = '''<!DOCTYPE html>
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>轻量任务管理</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" onerror="window.Chart=undefined"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f6f8;color:#1f2329;min-height:100vh}
@@ -588,7 +588,8 @@ function switchView(v,btn){
 async function loadData(){
   let r=await fetch('/api/tasks'),d=await r.json();
   tasks=d.tasks;
-  renderStats();renderCharts();renderList();
+  renderStats();renderList();
+  setTimeout(renderCharts,500);
 }
 function renderStats(){
   let now=new Date();now.setHours(0,0,0,0);
@@ -603,6 +604,7 @@ function renderStats(){
   document.getElementById('stCancel').textContent=cancel;
 }
 function renderCharts(){
+  if(typeof Chart === 'undefined') return;
   let counts={待开始:0,进行中:0,待验收:0,已完成:0,已取消:0};
   tasks.forEach(t=>{if(counts[t.status]!==undefined)counts[t.status]++});
   let colors={'待开始':'#3370ff','进行中':'#e67e22','待验收':'#7c3aed','已完成':'#1b8540','已取消':'#8f959e'};
