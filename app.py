@@ -408,7 +408,13 @@ def ai_generate_desc():
         return jsonify({'ok':False,'error':'请输入任务标题'})
     if not DEEPSEEK_KEY:
         return jsonify({'ok':False,'error':'未配置DeepSeek API Key'})
-    prompt = f"根据以下任务标题，写一段简洁的任务描述（2-3句话，包含交付物和大致时间节点）。只输出描述文本，不要任何前缀。\n\n任务标题：{title}"
+    context = f"任务标题：{title}"
+    if data.get('owner'): context += f"\n负责人：{data['owner']}"
+    if data.get('helpers'): context += f"\n协助人：{data['helpers']}"
+    if data.get('reviewer'): context += f"\n验收人：{data['reviewer']}"
+    if data.get('priority'): context += f"\n优先级：{data['priority']}"
+    if data.get('due_date'): context += f"\n截止日期：{data['due_date']}"
+    prompt = f"根据以下任务信息，写一段简洁的任务描述（2-3句话，包含交付物和具体产出形式）。只输出描述文本，不要任何前缀。\n\n{context}"
     try:
         resp = requests.post(DEEPSEEK_URL, headers={
             "Authorization": f"Bearer {DEEPSEEK_KEY}", "Content-Type": "application/json"
@@ -862,8 +868,9 @@ function openCreate(){openModal('createModal')}
 async function aiGenDesc(){
   let title=document.getElementById('cTitle').value.trim();
   if(!title)return showToast('请先填写任务标题',false);
+  let data={title:title,owner:document.getElementById('cOwner').value.trim(),helpers:document.getElementById('cHelpers').value.trim(),reviewer:document.getElementById('cReviewer').value.trim(),priority:prio,due_date:document.getElementById('cDue').value};
   let btn=event.target;btn.textContent='⏳ 生成中...';btn.disabled=true;
-  let r=await fetch('/api/ai-generate-desc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title})});
+  let r=await fetch('/api/ai-generate-desc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   let d=await r.json();
   btn.textContent='🤖 AI辅助撰写';btn.disabled=false;
   if(d.ok){document.getElementById('cDesc').value=d.description;showToast('已生成描述',true)}
