@@ -392,6 +392,120 @@ def save_config():
         set_config('webhook_url', data['webhook_url'].strip())
     return jsonify({'ok':True})
 
+# ========== 文件提交 ==========
+SUBMIT_HTML = '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>提交Word文档</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f6f8;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
+.card{background:#fff;border-radius:16px;padding:32px;max-width:460px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.card h2{font-size:20px;margin-bottom:4px}
+.card .subt{font-size:13px;color:#8f959e;margin-bottom:20px}
+.fld{margin-bottom:16px}
+.fld label{display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#1f2329}
+.fld select,.fld input[type="file"]{width:100%;padding:10px 12px;border:1px solid #dee0e3;border-radius:8px;font-size:14px;outline:none;font-family:inherit}
+.fld select:focus{border-color:#3370ff}
+.info{background:#f5f6f8;border-radius:8px;padding:12px;font-size:13px;margin-bottom:16px;display:none;line-height:1.8}
+.info .l{color:#8f959e}
+.btn{width:100%;padding:12px;border-radius:8px;border:none;font-size:15px;font-weight:600;cursor:pointer;transition:.2s}
+.btn-p{background:#3370ff;color:#fff}
+.btn-p:hover{background:#2860df}
+.btn-p:disabled{background:#b0c8ff;cursor:not-allowed}
+.msg{padding:12px;border-radius:8px;margin-top:16px;font-size:14px;text-align:center;display:none;line-height:1.6}
+.msg.ok{background:#e8f8ef;color:#1b8540;display:block}
+.msg.err{background:#fef0f0;color:#c9382b;display:block}
+.hint{font-size:11px;color:#8f959e;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>📎 提交Word文档</h2>
+  <p class="subt">选择任务后上传 .doc/.docx 文件</p>
+  <div id="msgBox"></div>
+  <div class="fld">
+    <label>选择任务</label>
+    <select id="taskSelect" onchange="onTaskChange()">
+      <option value="">-- 请选择任务 --</option>
+    </select>
+  </div>
+  <div class="info" id="taskInfo"></div>
+  <div class="fld">
+    <label>上传Word文档</label>
+    <input type="file" id="fileInput" accept=".doc,.docx" onchange="onFileChange()">
+    <p class="hint">仅支持 .doc / .docx 格式</p>
+  </div>
+  <button class="btn btn-p" id="submitBtn" disabled onclick="doSubmit()">提交</button>
+  <div id="resultBox"></div>
+</div>
+
+<script>
+let tasks=[],selectedId=null,file=null;
+async function loadTasks(){
+  let r=await fetch('/api/tasks'),d=await r.json();
+  tasks=d.tasks.filter(t=>['进行中','待验收'].includes(t.status));
+  let sel=document.getElementById('taskSelect');
+  tasks.forEach(t=>{
+    let o=document.createElement('option');o.value=t.id;
+    o.textContent=`[${t.status}] ${t.title}`;sel.appendChild(o);
+  });
+}
+function onTaskChange(){
+  let id=document.getElementById('taskSelect').value;
+  if(!id){selectedId=null;document.getElementById('taskInfo').style.display='none';updateBtn();return;}
+  selectedId=parseInt(id);
+  let t=tasks.find(x=>x.id==selectedId);
+  document.getElementById('taskInfo').style.display='block';
+  document.getElementById('taskInfo').innerHTML=`<span class="l">负责人：</span>${t.owner||'—'}<br><span class="l">验收人：</span>${t.reviewer||'—'}<br><span class="l">截止日期：</span>${t.due_date||'—'}<br><span class="l">当前产出：</span>${t.output||'无'}`;
+  updateBtn();
+}
+function onFileChange(){
+  file=document.getElementById('fileInput').files[0]||null;
+  updateBtn();
+}
+function updateBtn(){
+  document.getElementById('submitBtn').disabled=!selectedId||!file;
+}
+async function doSubmit(){
+  let btn=document.getElementById('submitBtn'),box=document.getElementById('resultBox');
+  btn.disabled=true;btn.textContent='提交中...';
+  let fd=new FormData();fd.append('file',file);
+  let r=await fetch('/submit/'+selectedId,{method:'POST',body:fd});
+  let d=await r.json();
+  box.innerHTML=`<div class="msg ${d.ok?'ok':'err'}">${d.ok?`✅ 提交成功！<br>文件：${d.filename}`:'❌ '+d.error}</div>`;
+  if(d.ok){document.getElementById('fileInput').value='';file=null;updateBtn();}
+  btn.disabled=false;btn.textContent='提交';
+}
+loadTasks();
+</script>
+</body></html>'''
+
+@app.route('/submit')
+def submit_page():
+    return render_template_string(SUBMIT_HTML)
+
+@app.route('/submit/<int:task_id>', methods=['POST'])
+def submit_file(task_id):
+    if 'file' not in request.files:
+        return jsonify({'ok':False,'error':'未选择文件'})
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'ok':False,'error':'文件名为空'})
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ('.doc','.docx'):
+        return jsonify({'ok':False,'error':'仅支持Word格式(.doc/.docx)'})
+    task = query("SELECT * FROM tasks WHERE id=?", (task_id,), one=True)
+    if not task:
+        return jsonify({'ok':False,'error':'任务不存在'})
+    title = task['title'].replace('/','_').replace('\\','_')[:30]
+    safe_name = f"task{task_id}_{title}{ext}"
+    filepath = os.path.join(UPLOAD_DIR, safe_name)
+    file.save(filepath)
+    execute("UPDATE tasks SET output=? WHERE id=?", (safe_name, task_id))
+    return jsonify({'ok':True,'filename':safe_name})
+
 # ========== HTML ==========
 HTML_INDEX = '''<!DOCTYPE html>
 <html lang="zh-CN">
@@ -463,7 +577,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
 .toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;font-size:14px;z-index:300;display:none}
 .toast.show{display:block}.toast.ok{background:#e8f8ef;color:#1b8540}.toast.err{background:#fef0f0;color:#c9382b}
-@media(max-width:768px){.sidebar{width:60px;padding:16px 0}.sidebar h1{font-size:0;padding:0;text-align:center;border:none;margin-bottom:12px}.sidebar h1::after{content:"📋";font-size:20px}.sidebar a{padding:10px 0;text-align:center;font-size:0}.sidebar a::before{content:"📄";font-size:16px}.main{margin-left:60px;padding:16px}}
+.file-card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:.2s;display:flex;flex-direction:column;gap:8px;overflow:hidden;max-width:100%;box-sizing:border-box}
+.file-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.file-card .fc-name{font-size:14px;font-weight:600;color:#1f2329;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-card .fc-meta{font-size:12px;color:#8f959e}
+.file-card .fc-actions{margin-top:auto;display:flex;gap:8px;align-items:center}
+@media(max-width:768px){.sidebar{width:60px;padding:16px 0}.sidebar h1{font-size:0;padding:0;text-align:center;border:none;margin-bottom:12px}.sidebar h1::after{content:"📋";font-size:20px}.sidebar a{padding:10px 0;text-align:center;font-size:0}.sidebar a::before{content:"📄";font-size:16px}.main{margin-left:60px;padding:16px}.file-card{padding:12px}}
 </style>
 </head>
 <body>
@@ -476,6 +595,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
   <a href="#" onclick="switchView('cancel',this);return false">🚫 已取消</a>
   <div style="margin-top:20px;border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
     <a href="#" onclick="switchView('files',this);return false">📁 文件管理</a>
+    <a href="/submit" target="_blank">📤 提交文件</a>
     <a href="#" onclick="switchView('guide',this);return false">📖 发布须知</a>
     <a href="#" onclick="switchView('charts',this);return false">📊 统计图表</a>
     <a href="#" onclick="openConfig();return false">⚙ 设置</a>
@@ -523,12 +643,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
     </div>
   </div>
 </div>
-</div>
 
-<div id="filesSection" style="display:none">
-  <div class="topbar"><h2>📁 文件管理</h2></div>
+<div id="filesSection" style="display:none;overflow-x:auto;max-width:100%">
+  <div class="topbar"><h2 id="filesTitle">📁 文件管理</h2></div>
+  <div id="fileStats" style="font-size:13px;color:#8f959e;margin-bottom:16px"></div>
   <div id="fileListBox" class="task-list"></div>
 </div>
+
 </div>
 
 <!-- Create Modal -->
@@ -658,7 +779,7 @@ function renderList(){
       else if(t.status=='待验收')btns=`<button class="btn btn-p" onclick="openReview(${t.id},'${t.title.replace(/'/g,"\\'")}')">验收</button>`;
       if(t.status!='已完成'&&t.status!='已取消')btns+=`<button class="btn btn-d" onclick="changeStatus(${t.id},'已取消')">取消</button>`;
       btns+=` <button class="btn btn-o" style="padding:4px 8px;font-size:11px" onclick="openEdit(${t.id})">✏️</button>`;
-      html+=`<div class="task"><div class="task-main"><div class="task-title"><span class="badge ${stBadge[t.status]||'bg-todo'}">${t.status}</span>${t.title}</div><div class="task-meta">👤 ${t.owner||'—'} | 📅 ${t.due_date||'—'}${t.helpers?` | 🤝 ${t.helpers}`:''}${t.score?` | ⭐${t.score}`:''}${t.output?` | <a href="/api/download/${encodeURIComponent(t.output)}" class="btn btn-o" style="display:inline;padding:2px 7px;font-size:11px;text-decoration:none">📎 下载Word</a>`:''}</div>${t.ai_review?`<div class="task-desc" style="margin-top:6px;padding:8px;border-radius:6px;background:${t.ai_review.startsWith('✅')?'#e8f8ef':'#fff8e8'};color:${t.ai_review.startsWith('✅')?'#1b8540':'#b76e00'};font-size:12px;line-height:1.5">🤖 ${t.ai_review}</div>`:''}${t.description?`<div class="task-desc">${t.description.slice(0,60)}</div>`:''}</div><div class="task-actions">${btns}</div></div>`;
+      html+=`<div class="task"><div class="task-main"><div class="task-title"><span class="badge ${stBadge[t.status]||'bg-todo'}">${t.status}</span>${t.title}</div><div class="task-meta">👤 ${t.owner||'—'} | 📅 ${t.due_date||'—'}${t.helpers?` | 🤝 ${t.helpers}`:''}${t.score?` | ⭐${t.score}`:''}</div>${t.ai_review?`<div class="task-desc" style="margin-top:6px;padding:8px;border-radius:6px;background:${t.ai_review.startsWith('✅')?'#e8f8ef':'#fff8e8'};color:${t.ai_review.startsWith('✅')?'#1b8540':'#b76e00'};font-size:12px;line-height:1.5">🤖 ${t.ai_review}</div>`:''}${t.description?`<div class="task-desc">${t.description.slice(0,60)}</div>`:''}</div><div class="task-actions">${btns}</div></div>`;
     });
   }
   document.getElementById('taskList').innerHTML=html;
@@ -748,13 +869,18 @@ async function saveConfig(){
   closeModal('configModal');showToast('已保存',true);
 }
 async function loadFiles(){
-  let r=await fetch('/api/files'),d=await r.json(),h='';
-  if(!d.files.length)h='<div class="empty">暂无文件</div>';
-  else d.files.forEach(f=>{
+  let r=await fetch('/api/files'),d=await r.json();
+  let box=document.getElementById('fileListBox');
+  if(!d.files.length){box.innerHTML='<div class="empty">暂无文件</div>';document.getElementById('fileStats').textContent='';return;}
+  let h='',totalSize=0;
+  d.files.forEach(f=>{
     let s=f.size<1024?f.size+' B':(f.size/1024).toFixed(1)+' KB';
-    h+=`<div class="task"><div class="task-main"><div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">📄 ${f.name}</div><div style="font-size:12px;color:#8f959e;margin-top:2px">${s} · ${f.time}</div></div><div class="task-actions"><a href="/api/download/${encodeURIComponent(f.name)}" class="btn btn-p" style="text-decoration:none;white-space:nowrap">⬇ 下载</a></div></div>`;
+    totalSize+=f.size;
+    h+=`<div class="task" style="display:block"><div style="font-size:14px;font-weight:600;margin-bottom:4px;word-break:break-all">📄 ${f.name}</div><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:#8f959e">${s} · ${f.time}</span><a href="/api/download/${encodeURIComponent(f.name)}" class="btn btn-p" style="text-decoration:none;flex-shrink:0">⬇ 下载</a></div></div>`;
   });
-  document.getElementById('fileListBox').innerHTML=h;
+  box.innerHTML=h;
+  let ts=totalSize<1024?totalSize+' B':totalSize<1048576?(totalSize/1024).toFixed(1)+' KB':(totalSize/1048576).toFixed(2)+' MB';
+  document.getElementById('fileStats').textContent=`共 ${d.files.length} 个文件，合计 ${ts}`;
 }
 loadData();
 </script>
