@@ -392,6 +392,28 @@ def save_config():
         set_config('webhook_url', data['webhook_url'].strip())
     return jsonify({'ok':True})
 
+@app.route('/api/push-submit-link', methods=['POST'])
+def push_submit_link():
+    url = get_config('webhook_url').strip()
+    if not url:
+        return jsonify({'ok':False,'error':'未配置群机器人Webhook'})
+    host = request.host_url.rstrip('/')
+    card = {
+        "msg_type": "interactive",
+        "card": {
+            "header": {"title": {"tag": "plain_text", "content": "📎 文档收集"}, "template": "blue"},
+            "elements": [
+                {"tag": "markdown", "content": f"请点击下方链接提交Word文档：\n\n📤 [提交文档]({host}/submit)\n\n仅支持 .doc / .docx 格式"}
+            ]
+        }
+    }
+    try:
+        r = requests.post(url, json=card, timeout=10)
+        ok = r.status_code == 200 and r.json().get('code') == 0
+        return jsonify({'ok':ok,'error':'' if ok else '推送失败'})
+    except Exception as e:
+        return jsonify({'ok':False,'error':str(e)})
+
 # ========== 文件提交 ==========
 SUBMIT_HTML = '''<!DOCTYPE html>
 <html lang="zh-CN">
@@ -602,7 +624,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
   </div>
 </div>
 <div class="main">
-<div class="topbar"><h2>任务看板</h2><button class="btn btn-p" onclick="openCreate()">+ 发布任务</button></div>
+<div class="topbar"><h2>任务看板</h2><div style="display:flex;gap:8px"><button class="btn btn-o" onclick="confirmPushLink()">📤 推送收集链接</button><button class="btn btn-p" onclick="openCreate()">+ 发布任务</button></div></div>
 
 <div id="filterBar" style="display:flex;gap:8px;margin-bottom:16px">
   <button class="btn btn-o active" onclick="setFilter('all',this)" style="border-color:#3370ff;color:#3370ff">全部</button>
@@ -697,6 +719,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 <div class="modal-actions">
   <button class="btn btn-o" onclick="closeModal('configModal')">取消</button>
   <button class="btn btn-p" onclick="saveConfig()">保存</button>
+</div></div></div>
+
+<!-- Push Confirm Modal -->
+<div class="modal-overlay" id="pushModal">
+<div class="modal">
+<h2>📤 推送文档收集链接</h2>
+<p style="font-size:14px;color:#646a73;margin-bottom:20px">将在群聊中推送文档收集链接，群成员点击即可自主提交Word文档。</p>
+<div class="modal-actions">
+  <button class="btn btn-o" onclick="closeModal('pushModal')">取消</button>
+  <button class="btn btn-p" onclick="doPushLink()">确定推送</button>
 </div></div></div>
 
 <div class="toast" id="toast"></div>
@@ -867,6 +899,13 @@ async function doEdit(){
 async function saveConfig(){
   await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({webhook_url:document.getElementById('cfgUrl').value.trim()})});
   closeModal('configModal');showToast('已保存',true);
+}
+function confirmPushLink(){openModal('pushModal')}
+async function doPushLink(){
+  let r=await fetch('/api/push-submit-link',{method:'POST'});
+  let d=await r.json();
+  closeModal('pushModal');
+  showToast(d.ok?'已推送到群聊':'推送失败: '+(d.error||'未知错误'),d.ok);
 }
 async function loadFiles(){
   let r=await fetch('/api/files'),d=await r.json();
