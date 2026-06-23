@@ -51,6 +51,7 @@ def init_db():
             value TEXT DEFAULT ''
         )''')
         db.execute("INSERT OR IGNORE INTO config(key,value) VALUES('webhook_url','')")
+        db.execute("INSERT OR IGNORE INTO config(key,value) VALUES('members','金崧,宋璟祺,何岗,王亚妮')")
         db.commit()
 
 init_db()
@@ -262,7 +263,7 @@ def index():
         'cancelled': sum(1 for t in tasks if t['status'] == '已取消'),
         'overdue': sum(1 for t in tasks if t['status'] in ('待开始','进行中') and t['due_date'] and t['due_date'] < datetime.datetime.now().strftime('%Y-%m-%d')),
     }
-    return render_template_string(HTML_INDEX, tasks=tasks, stats=stats, config={'webhook': get_config('webhook_url')})
+    return render_template_string(HTML_INDEX, tasks=tasks, stats=stats, config={'webhook': get_config('webhook_url'), 'members': get_config('members')})
 
 @app.route('/api/create', methods=['POST'])
 def create():
@@ -390,7 +391,14 @@ def save_config():
     data = request.json
     if 'webhook_url' in data:
         set_config('webhook_url', data['webhook_url'].strip())
+    if 'members' in data:
+        set_config('members', data['members'].strip())
     return jsonify({'ok':True})
+
+@app.route('/api/members')
+def get_members():
+    m = get_config('members')
+    return jsonify({'members':m.split(',') if m else []})
 
 @app.route('/api/push-submit-link', methods=['POST'])
 def push_submit_link():
@@ -661,7 +669,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
       <hr style="margin:16px 0;border-color:#f0f1f3">
       <p><strong>📎 产出物要求：Word格式</strong></p>
       <p><strong>📁 Word存放路径：</strong>D:\\test\\</p>
-      <p><strong>👥 人员名单：</strong>金崧、宋璟祺、何岗、王亚妮</p>
+      <p><strong>👥 人员名单：</strong><span id="guideMembers">{{ config.members }}</span></p>
     </div>
   </div>
 </div>
@@ -693,7 +701,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
   <button class="btn btn-o" onclick="closeModal('createModal')">取消</button>
   <button class="btn btn-p" onclick="doCreate()">发布</button>
 </div></div></div>
-<datalist id="staffList"><option value="金崧"><option value="宋璟祺"><option value="何岗"><option value="王亚妮"></datalist>
+<datalist id="staffList"></datalist>
 
 <!-- Edit Modal -->
 <div class="modal-overlay" id="editModal">
@@ -897,8 +905,15 @@ async function doEdit(){
   if((await r.json()).ok){closeModal('editModal');showToast('已修改，群聊收到更新通知',true);loadData()}
 }
 async function saveConfig(){
-  await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({webhook_url:document.getElementById('cfgUrl').value.trim()})});
-  closeModal('configModal');showToast('已保存',true);
+  await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({webhook_url:document.getElementById('cfgUrl').value.trim(),members:document.getElementById('cfgMembers').value.trim()})});
+  refreshMembers();closeModal('configModal');showToast('已保存，人员名单已更新',true);
+}
+function refreshMembers(){
+  fetch('/api/members').then(r=>r.json()).then(d=>{
+    let dl=document.getElementById('staffList');
+    dl.innerHTML=d.members.map(m=>`<option value="${m}">`).join('');
+    document.getElementById('guideMembers').textContent=d.members.join('、');
+  });
 }
 function confirmPushLink(){openModal('pushModal')}
 async function doPushLink(){
@@ -921,7 +936,7 @@ async function loadFiles(){
   let ts=totalSize<1024?totalSize+' B':totalSize<1048576?(totalSize/1024).toFixed(1)+' KB':(totalSize/1048576).toFixed(2)+' MB';
   document.getElementById('fileStats').textContent=`共 ${d.files.length} 个文件，合计 ${ts}`;
 }
-loadData();
+loadData();refreshMembers();
 </script>
 </body></html>'''
 
