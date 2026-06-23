@@ -400,6 +400,27 @@ def get_members():
     m = get_config('members')
     return jsonify({'members':m.split(',') if m else []})
 
+@app.route('/api/ai-generate-desc', methods=['POST'])
+def ai_generate_desc():
+    data = request.json
+    title = data.get('title', '').strip()
+    if not title:
+        return jsonify({'ok':False,'error':'请输入任务标题'})
+    if not DEEPSEEK_KEY:
+        return jsonify({'ok':False,'error':'未配置DeepSeek API Key'})
+    prompt = f"根据以下任务标题，写一段简洁的任务描述（2-3句话，包含交付物和大致时间节点）。只输出描述文本，不要任何前缀。\n\n任务标题：{title}"
+    try:
+        resp = requests.post(DEEPSEEK_URL, headers={
+            "Authorization": f"Bearer {DEEPSEEK_KEY}", "Content-Type": "application/json"
+        }, json={"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}],
+                 "temperature": 0.7, "max_tokens": 200}, timeout=15)
+        if resp.status_code == 200:
+            desc = resp.json()["choices"][0]["message"]["content"].strip()
+            return jsonify({'ok':True,'description':desc})
+        return jsonify({'ok':False,'error':'AI生成失败'})
+    except Exception as e:
+        return jsonify({'ok':False,'error':str(e)})
+
 @app.route('/api/push-submit-link', methods=['POST'])
 def push_submit_link():
     url = get_config('webhook_url').strip()
@@ -688,7 +709,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 <h2>📋 发布新任务</h2>
 <p style="font-size:12px;color:#8f959e;margin-bottom:12px">📎 产出物须为<strong>Word格式</strong></p>
 <div class="fld"><label class="req">任务标题</label><input id="cTitle" placeholder="一句话说清楚要做什么"></div>
-<div class="fld"><label>任务描述</label><textarea id="cDesc" rows="2" placeholder="详细说明（选填）"></textarea></div>
+<div class="fld"><label>任务描述 <button type="button" class="btn btn-o" style="padding:2px 10px;font-size:11px;margin-left:6px" onclick="aiGenDesc()">🤖 AI辅助撰写</button></label><textarea id="cDesc" rows="2" placeholder="详细说明（选填）"></textarea></div>
 <div class="fld"><label class="req">优先级</label><div class="prio-row" id="prioGroup">
   <div class="pb hi sel" data-v="高">高</div><div class="pb md" data-v="中">中</div><div class="pb lo" data-v="低">低</div></div>
 </div>
@@ -838,6 +859,16 @@ document.querySelectorAll('#prioGroup .pb').forEach(b=>{b.onclick=()=>{document.
 function openModal(id){document.getElementById(id).classList.add('show')}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
 function openCreate(){openModal('createModal')}
+async function aiGenDesc(){
+  let title=document.getElementById('cTitle').value.trim();
+  if(!title)return showToast('请先填写任务标题',false);
+  let btn=event.target;btn.textContent='⏳ 生成中...';btn.disabled=true;
+  let r=await fetch('/api/ai-generate-desc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title})});
+  let d=await r.json();
+  btn.textContent='🤖 AI辅助撰写';btn.disabled=false;
+  if(d.ok){document.getElementById('cDesc').value=d.description;showToast('已生成描述',true)}
+  else showToast(d.error,false);
+}
 function openConfig(){openModal('configModal')}
 function showToast(m,ok){let t=document.getElementById('toast');t.textContent=m;t.className='toast '+(ok?'ok':'err')+' show';setTimeout(()=>t.classList.remove('show'),2500)}
 
